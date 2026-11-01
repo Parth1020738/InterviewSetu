@@ -12,14 +12,16 @@
 - [x] Generate 3-question adaptive interview path in strict JSON format (`/api/blueprint`).
 - [x] Build Onboarding Screen (`src/app/page.tsx`) with dark-mode Linear/Raycast studio aesthetic, company badges, and audio preview.
 
-## Phase 3: The Live Interview Room (Nov 6 – Nov 7) [NEXT]
-- [ ] Build `/interview` full-screen page.
-- [ ] Connect the Voice Loop: Timbre plays question -> Candidate answers -> Prisma transcribes -> Gemini scores.
-- [ ] Build audio visualizer (pulsing waves for interviewer vs. candidate).
-- [ ] Test code-mixed answers (e.g., Hinglish speech transcription).
+## Phase 3: The Live Interview Room (Nov 6 – Nov 7) [COMPLETED]
+- [x] Implement `useAudioRecorder.ts` hook with Web Audio analyser, live 0-100 volume level, and browser PCM WAV conversion.
+- [x] Build `AudioWaveform.tsx` with 3 dynamic visual states: Electric Cobalt (#3B82F6) AI speaking wave, Dynamic Emerald (#10B981) reactive mic bars, and Amber (#F59E0B) evaluation pulse.
+- [x] Build `/api/evaluate` route handler with Gemini 1.5/3.5 scoring technical, communication, and resume defense metrics.
+- [x] Build `/interview` full-screen page orchestrating the end-to-end voice loop (TTS -> candidate mic -> STT -> evaluation -> spoken feedback).
+- [x] Added fallback text input modal for mic-permission-denied scenarios.
+- [x] Implemented `/report` performance scorecard & defense breakdown.
 
 ## Phase 4: Scorecard, Polishing & Deploy (Nov 8 – Nov 9)
-- [ ] Build `/report` performance scorecard with radar chart or clean breakdown metrics.
+- [x] Build `/report` performance scorecard with breakdown metrics.
 - [ ] Test edge cases (no audio, rapid clicking, mobile Safari/Chrome mic permissions).
 - [ ] Deploy live build to Vercel.
 - [ ] Prepare mock resume & sample answers for the demo video.

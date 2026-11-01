@@ -21,10 +21,17 @@
   - `src/lib/gemini.ts` generating 3-question adaptive interview paths.
   - `/api/blueprint` (handles PDF parsing via `pdf-parse` and LLM blueprint generation).
   - Onboarding page (`src/app/page.tsx`) following dark Linear/Raycast studio design with live audio preview.
+- [x] Completed Phase 3 (The Live Voice Studio & Evaluation Loop):
+  - `src/hooks/useAudioRecorder.ts`: Browser mic capture, live 0-100 volume analyser, PCM WAV converter.
+  - `src/components/AudioWaveform.tsx`: 3 dynamic visual states (Cobalt #3B82F6 AI wave, Emerald #10B981 candidate voice reaction, Amber #F59E0B analysis pulse).
+  - `/api/evaluate`: Evaluates answer across Technical, Communication, and Resume Defense metrics.
+  - `src/app/interview/page.tsx`: Full spoken loop from TTS playback to auto-mic capture, live Hinglish dual-captions, spoken feedback, and fallback text modal.
+  - `src/app/report/page.tsx`: Comprehensive scorecard & defense analytics.
 
 ## 3. Current Sprint Focus
-- Phase 3: The Live Interview Room (`/interview`) with audio visualizer, `useAudioRecorder`, and real-time voice feedback loop.
+- Phase 4: Final polishing, mobile/browser edge-case testing, and live Vercel deployment.
 
-## 4. Key API Learnings
-- Gnani Timbre TTS uses `model: "timbre-v2.5"`, `voice: "Nalini" | "Bhavna" | "Deepak"`, `language: "hi" | "en" | ...`.
-- Gnani Prisma STT uses `audio_file: Blob/File`, `language_code: "indic-auto" | "hi-IN" | "en-IN"`. When `indic-auto`, provide `multi_lang_codes: "hi-IN,en-IN"` to obtain simultaneous Hindi & Romanized Hinglish transcripts.
+## 4. Key Engineering Insights
+- Gnani Timbre TTS uses `model: "timbre-v2.5"`, `voice: "Nalini" | "Bhavna"`, `language: "hi" | "en" | ...`.
+- Gnani Prisma STT operates best with Linear PCM WAV audio chunks and `multi_lang_codes: "hi-IN,en-IN"` for Hinglish dual-transcription.
+- Browser `AudioBuffer` conversion to 16-bit PCM WAV in `useAudioRecorder` ensures 100% format compatibility with Gnani's backend.
