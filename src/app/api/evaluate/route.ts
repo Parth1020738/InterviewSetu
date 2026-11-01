@@ -16,27 +16,36 @@ export interface EvaluationPayload {
   areasToImprove: string[];
 }
 
+const MAX_QUESTION_CHARS = 1000;
+const MAX_ANSWER_CHARS = 5000;
+const MAX_CONTEXT_CHARS = 10000;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
 
-    if (!body || !body.currentQuestion || !body.candidateAnswer) {
+    if (
+      !body ||
+      typeof body.currentQuestion !== "string" ||
+      !body.currentQuestion.trim() ||
+      typeof body.candidateAnswer !== "string" ||
+      !body.candidateAnswer.trim()
+    ) {
       return NextResponse.json(
-        { error: "Fields 'currentQuestion' and 'candidateAnswer' are required." },
+        { error: "Fields 'currentQuestion' and 'candidateAnswer' are required non-empty strings." },
         { status: 400 }
       );
     }
 
-    const {
-      currentQuestion,
-      candidateAnswer,
-      resumeContext = "",
-      company = "Tech Firm",
-      role = "Software Engineer",
-      language = "Hinglish",
-      questionIndex = 0,
-      totalQuestions = 3,
-    } = body;
+    // Input length limits
+    const currentQuestion = body.currentQuestion.slice(0, MAX_QUESTION_CHARS);
+    const candidateAnswer = body.candidateAnswer.slice(0, MAX_ANSWER_CHARS);
+    const resumeContext = typeof body.resumeContext === "string" ? body.resumeContext.slice(0, MAX_CONTEXT_CHARS) : "";
+    const company = typeof body.company === "string" ? body.company.slice(0, 100) : "Tech Firm";
+    const role = typeof body.role === "string" ? body.role.slice(0, 100) : "Software Engineer";
+    const language = typeof body.language === "string" ? body.language.slice(0, 50) : "Hinglish";
+    const questionIndex = typeof body.questionIndex === "number" ? Math.max(0, body.questionIndex) : 0;
+    const totalQuestions = typeof body.totalQuestions === "number" ? Math.max(1, body.totalQuestions) : 3;
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -129,18 +138,25 @@ OUTPUT SCHEMA (STRICT JSON ONLY):
       throw new Error(`Failed to evaluate answer with Gemini: ${lastError?.message}`);
     }
 
-    return NextResponse.json({
-      success: true,
-      evaluation: evaluationResult,
-    });
-  } catch (error: any) {
-    console.error("API /api/evaluate error:", error);
     return NextResponse.json(
       {
-        error: error.message || "Failed to evaluate candidate response.",
+        success: true,
+        evaluation: evaluationResult,
+      },
+      {
+        status: 200,
+        headers: {
+          "X-Content-Type-Options": "nosniff",
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error("API /api/evaluate error:", error?.message || error);
+    return NextResponse.json(
+      {
+        error: "Failed to evaluate candidate response. Please try again.",
       },
       { status: 500 }
     );
   }
 }
-

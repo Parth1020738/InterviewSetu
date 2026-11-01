@@ -4,8 +4,15 @@
 .pnp.js
 .yarn/install-state.gz
 
-# testing
+# testing & temporary test scripts
 /coverage
+test_*.mjs
+test_*.js
+scratch_*.js
+scratch_*.mjs
+scripts/e2e-*.mjs
+*.wav
+*.mp3
 
 # next.js
 /.next/
@@ -17,11 +24,7 @@
 # misc
 .DS_Store
 *.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+*.log
 
 # local env files
 .env*.local
@@ -35,4 +38,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-

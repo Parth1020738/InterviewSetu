@@ -3,6 +3,9 @@ import { generateInterviewBlueprint } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
+const MAX_PDF_BYTES = 5 * 1024 * 1024; // 5MB limit
+const MAX_TEXT_LENGTH = 15000; // 15,000 characters limit
+
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
@@ -12,14 +15,25 @@ export async function POST(req: NextRequest) {
     let language = "Hinglish";
 
     if (contentType.includes("multipart/form-data")) {
-      const formData = await req.formData();
+      const formData = await req.formData().catch(() => null);
+      if (!formData) {
+        return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
+      }
+
       const file = formData.get("resume") as File | null;
-      company = (formData.get("company") as string) || company;
-      role = (formData.get("role") as string) || role;
-      language = (formData.get("language") as string) || language;
+      company = (formData.get("company") as string)?.slice(0, 100) || company;
+      role = (formData.get("role") as string)?.slice(0, 100) || role;
+      language = (formData.get("language") as string)?.slice(0, 50) || language;
       const textParam = formData.get("resumeText") as string | null;
 
       if (file && file.size > 0) {
+        if (file.size > MAX_PDF_BYTES) {
+          return NextResponse.json(
+            { error: "Resume file exceeds maximum allowable size of 5MB." },
+            { status: 413 }
+          );
+        }
+
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         try {
@@ -36,10 +50,15 @@ export async function POST(req: NextRequest) {
       }
     } else {
       const body = await req.json().catch(() => ({}));
-      resumeText = body.resumeText || "";
-      company = body.company || company;
-      role = body.role || role;
-      language = body.language || language;
+      resumeText = typeof body.resumeText === "string" ? body.resumeText : "";
+      company = typeof body.company === "string" ? body.company.slice(0, 100) : company;
+      role = typeof body.role === "string" ? body.role.slice(0, 100) : role;
+      language = typeof body.language === "string" ? body.language.slice(0, 50) : language;
+    }
+
+    // Safety validation & truncation
+    if (resumeText.length > MAX_TEXT_LENGTH) {
+      resumeText = resumeText.slice(0, MAX_TEXT_LENGTH);
     }
 
     if (!resumeText.trim()) {
@@ -53,15 +72,23 @@ export async function POST(req: NextRequest) {
       language,
     });
 
-    return NextResponse.json({
-      success: true,
-      blueprint,
-    });
-  } catch (error: any) {
-    console.error("API /api/blueprint error:", error);
     return NextResponse.json(
       {
-        error: error.message || "Failed to generate interview blueprint with Gemini.",
+        success: true,
+        blueprint,
+      },
+      {
+        status: 200,
+        headers: {
+          "X-Content-Type-Options": "nosniff",
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error("API /api/blueprint error:", error?.message || error);
+    return NextResponse.json(
+      {
+        error: "Failed to generate interview blueprint. Please try again.",
       },
       { status: 500 }
     );

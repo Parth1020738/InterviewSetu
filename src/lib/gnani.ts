@@ -19,6 +19,57 @@ export interface TranscribeAudioResult {
 }
 
 /**
+ * Ensures audio buffer has a standard 44-byte RIFF WAVE header.
+ * Gnani Timbre returns raw 16-bit 48kHz mono PCM, so wrapping with RIFF guarantees
+ * universal HTML5 audio playback and seamless STT ingestion.
+ */
+function addWavHeader(pcmBuffer: ArrayBuffer, sampleRate: number = 48000): ArrayBuffer {
+  const bytes = new Uint8Array(pcmBuffer);
+  // Check if it already has "RIFF"
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 && // 'R'
+    bytes[1] === 0x49 && // 'I'
+    bytes[2] === 0x46 && // 'F'
+    bytes[3] === 0x46    // 'F'
+  ) {
+    return pcmBuffer;
+  }
+
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = pcmBuffer.byteLength;
+  const headerSize = 44;
+  const outBuffer = new ArrayBuffer(headerSize + dataSize);
+  const view = new DataView(outBuffer);
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  new Uint8Array(outBuffer, headerSize).set(new Uint8Array(pcmBuffer));
+  return outBuffer;
+}
+
+/**
  * Normalizes language codes for Gnani Timbre TTS
  */
 export function normalizeTTSLanguage(lang?: string): string {
@@ -55,7 +106,7 @@ export function normalizeSTTLanguage(lang?: string): { code: string; multi?: str
 
 /**
  * Calls Gnani Timbre TTS inference endpoint
- * Returns audio ArrayBuffer (WAV/Linear PCM)
+ * Returns audio ArrayBuffer with guaranteed valid RIFF WAV container
  */
 export async function synthesizeSpeech(
   text: string,
@@ -79,6 +130,7 @@ export async function synthesizeSpeech(
     headers: {
       "X-API-Key-ID": apiKey,
       "Content-Type": "application/json",
+      "User-Agent": "InterviewSetu/1.0",
     },
     body: JSON.stringify(payload),
   });
@@ -90,8 +142,9 @@ export async function synthesizeSpeech(
     );
   }
 
-  const audioBuffer = await response.arrayBuffer();
-  return audioBuffer;
+  const rawBuffer = await response.arrayBuffer();
+  // Ensure valid RIFF header is present
+  return addWavHeader(rawBuffer, 48000);
 }
 
 /**
@@ -135,6 +188,7 @@ export async function transcribeAudio(
     method: "POST",
     headers: {
       "X-API-Key-ID": apiKey,
+      "User-Agent": "InterviewSetu/1.0",
     },
     body: formData,
   });
@@ -172,4 +226,3 @@ export async function transcribeAudio(
     latency: data.end_to_end_latency,
   };
 }
-

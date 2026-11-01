@@ -3,6 +3,8 @@ import { transcribeAudio } from "@/lib/gnani";
 
 export const dynamic = "force-dynamic";
 
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10MB limit
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData().catch(() => null);
@@ -14,25 +16,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const hasAudio = formData.has("audio_file") || formData.has("audio");
-    if (!hasAudio) {
+    const audioEntry = formData.get("audio_file") || formData.get("audio");
+    if (!audioEntry) {
       return NextResponse.json(
         { error: "Missing audio recording in form data ('audio_file' or 'audio')." },
         { status: 400 }
       );
     }
 
+    // Safety validation: file size limit
+    if (audioEntry instanceof Blob && audioEntry.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json(
+        { error: "Audio file exceeds maximum allowable size of 10MB." },
+        { status: 413 }
+      );
+    }
+
     const result = await transcribeAudio(formData);
 
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(result, {
+      status: 200,
+      headers: {
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   } catch (error: any) {
-    console.error("API /api/stt error:", error);
+    console.error("API /api/stt error:", error?.message || error);
+    // Sanitize error: never leak upstream credentials or raw stack traces
     return NextResponse.json(
       {
-        error: error.message || "Failed to transcribe audio with Gnani Prisma.",
+        error: "Failed to transcribe audio. Please verify server credentials and try again.",
       },
       { status: 500 }
     );
   }
 }
-
