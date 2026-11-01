@@ -9,14 +9,13 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import {
   Sparkles,
   ArrowRight,
-  Bot,
   Volume2,
   CheckCircle,
-  Play,
   RotateCw,
   Cpu,
   Radio,
   FileCheck,
+  Zap,
 } from "lucide-react";
 
 export default function OnboardingPage() {
@@ -38,22 +37,49 @@ export default function OnboardingPage() {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [previewAudioUrl, setPreviewAudioUrl] = useState<string | null>(null);
 
-  const handleGenerateBlueprint = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const sampleResumeText = `Parth Patel
+Software Engineering Graduate & Full-Stack Developer
+Email: parth@example.com | Portfolio: parthdev.io
+
+EXPERIENCE & PROJECTS:
+1. Real-Time Chat & Notification Microservice (Node.js, Redis, WebSockets, PostgreSQL)
+   - Architected pub/sub communication handling 5,000+ concurrent connections with <40ms message latency.
+   - Implemented distributed cache invalidation and connection heartbeat monitoring in Redis.
+2. Indic Voice AI Assistant (Next.js, Web Speech, Tailwind CSS)
+   - Built an interactive voice frontend with Web Audio API for audio visualization and low-latency playback.
+   - Integrated custom REST endpoints for speech-to-text transcription and fallback synthesis.
+
+SKILLS:
+- Languages & Frameworks: TypeScript, JavaScript, Python, React, Next.js, Node.js, Express.
+- Databases & Infrastructure: PostgreSQL, Redis, Docker, REST APIs, Git.`;
+
+  const handleGenerateBlueprint = async (
+    e?: React.FormEvent,
+    overrideText?: string,
+    overrideCompany?: string,
+    overrideRole?: string,
+    overrideLang?: string
+  ) => {
+    if (e) e.preventDefault();
     setIsGenerating(true);
     setErrorMessage(null);
     setBlueprint(null);
     setPreviewAudioUrl(null);
 
+    const textToUse = overrideText !== undefined ? overrideText : customText;
+    const companyToUse = overrideCompany || selectedCompany;
+    const roleToUse = overrideRole || selectedRole;
+    const langToUse = overrideLang || selectedLanguage;
+
     try {
       const formData = new FormData();
-      if (selectedFile) {
+      if (selectedFile && overrideText === undefined) {
         formData.append("resume", selectedFile);
       }
-      formData.append("resumeText", customText);
-      formData.append("company", selectedCompany);
-      formData.append("role", selectedRole);
-      formData.append("language", selectedLanguage);
+      formData.append("resumeText", textToUse);
+      formData.append("company", companyToUse);
+      formData.append("role", roleToUse);
+      formData.append("language", langToUse);
 
       const res = await fetch("/api/blueprint", {
         method: "POST",
@@ -72,9 +98,9 @@ export default function OnboardingPage() {
           "interviewsetu_session",
           JSON.stringify({
             blueprint: data.blueprint,
-            company: selectedCompany,
-            role: selectedRole,
-            language: selectedLanguage,
+            company: companyToUse,
+            role: roleToUse,
+            language: langToUse,
             startedAt: new Date().toISOString(),
           })
         );
@@ -85,6 +111,21 @@ export default function OnboardingPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleQuickDemo = () => {
+    setSelectedFile(null);
+    setCustomText(sampleResumeText);
+    setSelectedCompany("Swiggy");
+    setSelectedRole("Fullstack Engineer (React + Node)");
+    setSelectedLanguage("Hinglish");
+    handleGenerateBlueprint(
+      undefined,
+      sampleResumeText,
+      "Swiggy",
+      "Fullstack Engineer (React + Node)",
+      "Hinglish"
+    );
   };
 
   const handleTestTTS = async (text: string) => {
@@ -142,8 +183,49 @@ export default function OnboardingPage() {
           </p>
         </div>
 
+        {/* Quick Demo CTA Card for Live Judges */}
+        <div className="p-4 rounded-xl bg-gradient-to-r from-[#1A202C] via-[#121620] to-[#1A202C] border border-[#F59E0B]/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-[#F59E0B]/5">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center text-[#F59E0B] flex-shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-semibold text-[#F8FAFC]">
+                  Evaluating the Live Demo?
+                </p>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">
+                  Instant Setup
+                </span>
+              </div>
+              <p className="text-xs text-[#94A3B8] mt-0.5">
+                Load a pre-built Fullstack engineer profile (Redis, WebSockets, Node.js) for Swiggy with one click.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleQuickDemo}
+            disabled={isGenerating}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#0A0D14] font-semibold text-xs flex items-center justify-center space-x-2 transition-all shadow-md flex-shrink-0 disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <>
+                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Launching...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Try with Sample Resume</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Configuration Setup Form */}
-        <form onSubmit={handleGenerateBlueprint} className="space-y-6">
+        <form onSubmit={(e) => handleGenerateBlueprint(e)} className="space-y-6">
           {/* Card: Candidate Setup */}
           <div className="bg-[#121620] border border-[#232B3E] rounded-xl p-5 sm:p-6 space-y-6 shadow-sm">
             {/* Step 1: Resume Upload */}
@@ -188,7 +270,7 @@ export default function OnboardingPage() {
             <div className="text-xs text-[#94A3B8] font-mono flex items-center space-x-2">
               <Cpu className="w-4 h-4 text-[#F59E0B]" />
               <span>
-                Gemini 1.5 Flash extracts actual claims &amp; generates 3-stage adaptive interview path
+                Gemini extracts actual claims &amp; generates 3-stage adaptive interview path
               </span>
             </div>
 
@@ -304,4 +386,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-

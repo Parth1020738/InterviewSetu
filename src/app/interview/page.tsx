@@ -7,18 +7,13 @@ import { AudioWaveform, WaveformMode } from "@/components/AudioWaveform";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import {
   Mic,
-  MicOff,
   Square,
-  Volume2,
-  VolumeX,
   Keyboard,
   ArrowRight,
   Sparkles,
-  Clock,
-  Radio,
-  RotateCw,
+  Zap,
+  Volume2,
   AlertTriangle,
-  ChevronRight,
 } from "lucide-react";
 
 interface QuestionItem {
@@ -65,14 +60,16 @@ export default function InterviewPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [activeQuestionText, setActiveQuestionText] = useState("");
   const [evaluations, setEvaluations] = useState<QuestionEvaluation[]>([]);
-  const [latencyIndicator, setLatencyIndicator] = useState<number | null>(null);
+
+  // Latency metrics
+  const [sttLatency, setSttLatency] = useState<number | null>(null);
+  const [ttsLatency, setTtsLatency] = useState<number | null>(null);
 
   // Audio & Voice Loop State
   const [waveformMode, setWaveformMode] = useState<WaveformMode>("idle");
   const [statusMessage, setStatusMessage] = useState("Initializing audio engine...");
   const [currentTranscript, setCurrentTranscript] = useState("");
   const [dualTranscripts, setDualTranscripts] = useState<Record<string, string> | null>(null);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Fallback Text Input Mode
@@ -89,8 +86,9 @@ export default function InterviewPage() {
     stopRecording,
   } = useAudioRecorder();
 
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const loopActiveRef = useRef(false);
+  const activeAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const playbackCtxRef = useRef<AudioContext | null>(null);
 
   // Load Session from localStorage on mount
   useEffect(() => {
@@ -108,10 +106,10 @@ export default function InterviewPage() {
         console.error("Failed to parse session data:", err);
       }
     } else {
-      // Fallback demo session if user directly navigated
+      // Fallback demo session if visited directly
       const mock: InterviewSessionData = {
         blueprint: {
-          candidateName: "Candidate",
+          candidateName: "Parth Patel",
           extractedSkills: ["React", "Node.js", "Redis", "PostgreSQL"],
           extractedProjects: ["Real-time WebSocket Chat Microservice"],
           companyFocus: "Swiggy",
@@ -121,7 +119,7 @@ export default function InterviewPage() {
               id: 1,
               type: "project_deep_dive",
               question:
-                "Aapne resume me likha hai ki aapne Redis use kiya tha chat service me. Can you explain cache invalidation and connection heartbeat kaise handle kiya?",
+                "Parth, aapne resume me mention kiya hai ki aapne Redis use kiya tha chat service me. Can you explain cache invalidation aur connection heartbeat kaise handle kiya?",
               intent: "Assess distributed caching and WebSocket resiliency under load",
             },
             {
@@ -150,7 +148,7 @@ export default function InterviewPage() {
     }
   }, []);
 
-  // Play TTS Audio helper
+  // Web Audio buffer playback helper (Zero first-syllable clipping)
   const playTTSAudio = useCallback(
     async (text: string, language: string): Promise<void> => {
       return new Promise(async (resolve) => {
@@ -173,25 +171,32 @@ export default function InterviewPage() {
             return;
           }
 
-          const blob = await res.blob();
           const latency = Math.round(performance.now() - startTime);
-          setLatencyIndicator(latency);
+          setTtsLatency(latency);
 
-          const audioUrl = URL.createObjectURL(blob);
-          const audio = new Audio(audioUrl);
-          audioPlayerRef.current = audio;
+          const arrayBuffer = await res.arrayBuffer();
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          const ctx = new AudioCtx();
+          playbackCtxRef.current = ctx;
 
-          audio.onended = () => {
+          // Decode Linear PCM WAV in browser
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          const source = ctx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(ctx.destination);
+          activeAudioSourceRef.current = source;
+
+          source.onended = () => {
             setWaveformMode("idle");
-            resolve();
+            try {
+              ctx.close();
+            } catch (_) {}
+            // Provide a smooth 400ms buffer before mic activation to prevent echo
+            setTimeout(resolve, 400);
           };
 
-          audio.onerror = () => {
-            console.warn("Audio playback error, falling back to Web Speech");
-            fallbackWebSpeech(text, language, resolve);
-          };
-
-          await audio.play();
+          // Pristine playback from sample 0
+          source.start(0);
         } catch (err) {
           console.error("playTTSAudio error:", err);
           fallbackWebSpeech(text, language, resolve);
@@ -214,11 +219,11 @@ export default function InterviewPage() {
       utterance.rate = 1.0;
       utterance.onend = () => {
         setWaveformMode("idle");
-        onComplete();
+        setTimeout(onComplete, 400);
       };
       utterance.onerror = () => {
         setWaveformMode("idle");
-        onComplete();
+        setTimeout(onComplete, 400);
       };
       window.speechSynthesis.speak(utterance);
     } else {
@@ -273,7 +278,7 @@ export default function InterviewPage() {
     if (isProcessing) return;
     setIsProcessing(true);
     setWaveformMode("processing");
-    setStatusMessage("Transcribing with Gnani Prisma & analyzing...");
+    setStatusMessage("Transcribing with Gnani Prisma & evaluating...");
 
     let transcript = manualText || "";
     let extractedDual: Record<string, string> | null = null;
@@ -295,8 +300,8 @@ export default function InterviewPage() {
           });
 
           const sttData = await sttRes.json();
-          const sttLatency = Math.round(performance.now() - startTime);
-          setLatencyIndicator(sttLatency);
+          const latency = Math.round(performance.now() - startTime);
+          setSttLatency(latency);
 
           if (sttRes.ok && sttData.transcript) {
             transcript = sttData.transcript;
@@ -357,7 +362,7 @@ export default function InterviewPage() {
         evaluation.nextAction === "complete" || currentQuestionIndex >= totalQ - 1;
 
       // Speak feedback out loud first
-      setStatusMessage("Interviewer is giving verbal feedback...");
+      setStatusMessage("Interviewer is providing verbal feedback...");
       await playTTSAudio(evaluation.verbalFeedback, sessionData?.language || "Hinglish");
 
       if (isComplete) {
@@ -391,7 +396,7 @@ export default function InterviewPage() {
       }
     } catch (err: any) {
       console.error("Answer loop error:", err);
-      setStatusMessage(`Error: ${err.message}. Retrying or switch to text mode.`);
+      setStatusMessage(`Notice: ${err.message}. Retrying or switch to text mode.`);
       setWaveformMode("idle");
     } finally {
       setIsProcessing(false);
@@ -409,7 +414,7 @@ export default function InterviewPage() {
       <Header />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6 flex flex-col justify-between space-y-6">
-        {/* Top Control & Latency Bar */}
+        {/* Top Control & Live Latency Bar */}
         <div className="flex items-center justify-between border-b border-[#232B3E] pb-3 text-xs font-mono text-[#94A3B8]">
           <div className="flex items-center space-x-3">
             <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#121620] border border-[#232B3E] text-[#F8FAFC]">
@@ -422,14 +427,22 @@ export default function InterviewPage() {
             </span>
           </div>
 
-          <div className="flex items-center space-x-3">
-            {latencyIndicator && (
-              <span className="hidden sm:flex items-center space-x-1 text-[11px] text-[#10B981]">
-                <Radio className="w-3 h-3 animate-pulse" />
-                <span>Gnani Latency: {latencyIndicator}ms</span>
+          <div className="flex items-center space-x-2.5">
+            {/* Live STT Latency Pill */}
+            {sttLatency !== null && (
+              <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-[#10B981]/10 border border-[#10B981]/30 text-[11px] font-mono text-[#10B981]">
+                <Zap className="w-3 h-3 text-[#10B981]" />
+                <span>⚡ STT: {sttLatency}ms</span>
               </span>
             )}
-            <span className="px-2 py-0.5 rounded bg-[#1A202C] border border-[#232B3E] text-[#F8FAFC]">
+            {/* Live TTS Latency Pill */}
+            {ttsLatency !== null && (
+              <span className="hidden md:flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-[#3B82F6]/10 border border-[#3B82F6]/30 text-[11px] font-mono text-[#3B82F6]">
+                <Volume2 className="w-3 h-3 text-[#3B82F6]" />
+                <span>TTS: {ttsLatency}ms</span>
+              </span>
+            )}
+            <span className="px-2.5 py-1 rounded bg-[#1A202C] border border-[#232B3E] text-[#F8FAFC]">
               Question {currentQuestionIndex + 1} / {sessionData?.blueprint?.questions?.length || 3}
             </span>
           </div>
