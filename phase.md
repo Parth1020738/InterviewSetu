@@ -1,17 +1,18 @@
 # Execution Phases & Timeline (Target: Nov 10, 2026)
 
-## Phase 1: API Spike & Audio Core (Nov 2 – Nov 3)
-- [ ] Test Gnani Prisma STT endpoint with a sample WAV file in Postman/curl.
-- [ ] Test Gnani Timbre TTS endpoint (`https://api.vachana.ai/api/v1/tts/inference`) with Hindi & Hinglish text.
-- [ ] Build `/api/stt` and `/api/tts` Next.js route handlers.
-- [ ] Implement `useAudioRecorder.ts` hook to record microphone audio and send as `FormData`.
+## Phase 1: API Spike & Audio Core (Nov 2 – Nov 3) [COMPLETED]
+- [x] Test Gnani Prisma STT endpoint with live WAV file & Hinglish audio (`indic-auto`, `hi-IN`).
+- [x] Test Gnani Timbre TTS endpoint (`https://api.vachana.ai/api/v1/tts/inference`) with Hindi, Hinglish & English text.
+- [x] Build `/api/stt` and `/api/tts` Next.js route handlers with server-side API key protection.
+- [x] Implement `src/lib/gnani.ts` wrapping `synthesizeSpeech` and `transcribeAudio`.
 
-## Phase 2: Resume & Blueprint Engine (Nov 4 – Nov 5)
-- [ ] Build Resume PDF text extraction (using `pdf-parse` or client canvas).
-- [ ] Implement Gemini prompt combining: `[Resume Text] + [Target Company] + [Selected Language]`.
-- [ ] Generate 3-question interview path in strict JSON format.
+## Phase 2: Resume & Blueprint Engine (Nov 4 – Nov 5) [COMPLETED]
+- [x] Build Resume PDF text extraction (using `pdf-parse` with fallback pasting & sample resume).
+- [x] Implement Gemini prompt engine combining: `[Resume Text] + [Target Company] + [Selected Language]`.
+- [x] Generate 3-question adaptive interview path in strict JSON format (`/api/blueprint`).
+- [x] Build Onboarding Screen (`src/app/page.tsx`) with dark-mode Linear/Raycast studio aesthetic, company badges, and audio preview.
 
-## Phase 3: The Live Interview Room (Nov 6 – Nov 7)
+## Phase 3: The Live Interview Room (Nov 6 – Nov 7) [NEXT]
 - [ ] Build `/interview` full-screen page.
 - [ ] Connect the Voice Loop: Timbre plays question -> Candidate answers -> Prisma transcribes -> Gemini scores.
 - [ ] Build audio visualizer (pulsing waves for interviewer vs. candidate).
