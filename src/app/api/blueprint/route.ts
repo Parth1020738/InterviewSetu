@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateInterviewBlueprint } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024; // 5MB limit
 const MAX_TEXT_LENGTH = 15000; // 15,000 characters limit
