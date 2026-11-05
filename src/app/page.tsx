@@ -16,6 +16,9 @@ import {
   Radio,
   FileCheck,
   Zap,
+  Briefcase,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export default function OnboardingPage() {
@@ -24,6 +27,8 @@ export default function OnboardingPage() {
   // Form State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customText, setCustomText] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [showJdInput, setShowJdInput] = useState(false);
   const [selectedRole, setSelectedRole] = useState(
     "Fullstack Engineer (React + Node)"
   );
@@ -53,12 +58,20 @@ SKILLS:
 - Languages & Frameworks: TypeScript, JavaScript, Python, React, Next.js, Node.js, Express.
 - Databases & Infrastructure: PostgreSQL, Redis, Docker, REST APIs, Git.`;
 
+  const sampleJdText = `Role: Senior Fullstack Engineer at Swiggy
+Key Responsibilities:
+- Build high-throughput, low-latency microservices for live hyperlocal order dispatch.
+- Design resilient pub/sub event streams using Kafka or Redis clusters under peak load spikes.
+- Manage PostgreSQL replication, sharding, and cache invalidation consistency.
+- Handle production fire drills, circuit breakers, and zero-downtime rollouts.`;
+
   const handleGenerateBlueprint = async (
     e?: React.FormEvent,
     overrideText?: string,
     overrideCompany?: string,
     overrideRole?: string,
-    overrideLang?: string
+    overrideLang?: string,
+    overrideJd?: string
   ) => {
     if (e) e.preventDefault();
     setIsGenerating(true);
@@ -67,6 +80,7 @@ SKILLS:
     setPreviewAudioUrl(null);
 
     const textToUse = overrideText !== undefined ? overrideText : customText;
+    const jdToUse = overrideJd !== undefined ? overrideJd : jobDescription;
     const companyToUse = overrideCompany || selectedCompany;
     const roleToUse = overrideRole || selectedRole;
     const langToUse = overrideLang || selectedLanguage;
@@ -77,6 +91,9 @@ SKILLS:
         formData.append("resume", selectedFile);
       }
       formData.append("resumeText", textToUse);
+      if (jdToUse) {
+        formData.append("jobDescription", jdToUse);
+      }
       formData.append("company", companyToUse);
       formData.append("role", roleToUse);
       formData.append("language", langToUse);
@@ -101,6 +118,7 @@ SKILLS:
             company: companyToUse,
             role: roleToUse,
             language: langToUse,
+            jobDescription: jdToUse,
             startedAt: new Date().toISOString(),
           })
         );
@@ -116,6 +134,8 @@ SKILLS:
   const handleQuickDemo = () => {
     setSelectedFile(null);
     setCustomText(sampleResumeText);
+    setJobDescription(sampleJdText);
+    setShowJdInput(true);
     setSelectedCompany("Swiggy");
     setSelectedRole("Fullstack Engineer (React + Node)");
     setSelectedLanguage("Hinglish");
@@ -124,7 +144,8 @@ SKILLS:
       sampleResumeText,
       "Swiggy",
       "Fullstack Engineer (React + Node)",
-      "Hinglish"
+      "Hinglish",
+      sampleJdText
     );
   };
 
@@ -176,7 +197,7 @@ SKILLS:
             Context-Grounded Multilingual Voice Interviewer
           </h1>
           <p className="text-sm sm:text-base text-[#94A3B8] max-w-3xl leading-relaxed">
-            Practice high-stakes engineering interviews grounded directly in your resume projects and target company questions. Speak freely in{" "}
+            Practice high-stakes engineering interviews grounded directly in your resume projects and target Job Description. Preview topics on onboarding, then face fresh, dynamic deep dives in{" "}
             <span className="text-[#F8FAFC] font-medium">Hinglish, Hindi, or English</span> powered by{" "}
             <span className="text-[#F59E0B] font-medium">Gnani Prisma STT</span> &amp;{" "}
             <span className="text-[#3B82F6] font-medium">Timbre TTS</span>.
@@ -199,7 +220,7 @@ SKILLS:
                 </span>
               </div>
               <p className="text-xs text-[#94A3B8] mt-0.5">
-                Load a pre-built Fullstack engineer profile (Redis, WebSockets, Node.js) for Swiggy with one click.
+                Load a pre-built Fullstack engineer profile (Redis, WebSockets, Node.js) paired with a Swiggy Job Description with one click.
               </p>
             </div>
           </div>
@@ -212,12 +233,12 @@ SKILLS:
             {isGenerating ? (
               <>
                 <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Launching...</span>
+                <span>Synthesizing...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Try with Sample Resume</span>
+                <span>Try with Sample Resume &amp; JD</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}
@@ -238,6 +259,49 @@ SKILLS:
               customText={customText}
               onCustomTextChange={setCustomText}
             />
+
+            {/* Optional Step 1B: Target Job Description (JD) Input */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowJdInput(!showJdInput)}
+                  className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] hover:text-[#F8FAFC] flex items-center space-x-1.5 transition-colors"
+                >
+                  <Briefcase className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <span>Optional: Add Target Job Description (JD)</span>
+                  {showJdInput ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-[#94A3B8]" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />
+                  )}
+                </button>
+                {showJdInput && (
+                  <button
+                    type="button"
+                    onClick={() => setJobDescription(sampleJdText)}
+                    className="text-xs text-[#F59E0B] hover:text-[#F59E0B]/80 underline font-mono"
+                  >
+                    Paste Sample Swiggy JD
+                  </button>
+                )}
+              </div>
+
+              {showJdInput && (
+                <div className="space-y-1.5 animate-in fade-in duration-200">
+                  <textarea
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    placeholder="Paste the target job description or key technical requirements here (e.g., Must have Kafka, distributed systems, high availability)..."
+                    rows={4}
+                    className="w-full bg-[#0A0D14] border border-[#232B3E] rounded-xl p-3.5 text-xs font-mono text-[#F8FAFC] placeholder:text-[#94A3B8]/60 focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] transition-all resize-none"
+                  />
+                  <p className="text-[11px] text-[#94A3B8] font-mono">
+                    If provided, questions will be targeted to the exact intersection of your resume and this JD.
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="h-[1px] bg-[#232B3E]" />
 
@@ -270,7 +334,7 @@ SKILLS:
             <div className="text-xs text-[#94A3B8] font-mono flex items-center space-x-2">
               <Cpu className="w-4 h-4 text-[#F59E0B]" />
               <span>
-                Gemini extracts actual claims &amp; generates 3-stage adaptive interview path
+                Gemini generates a screening preview blueprint + fresh dynamic live questions
               </span>
             </div>
 
@@ -310,6 +374,11 @@ SKILLS:
                 <p className="text-xs text-[#94A3B8] mt-0.5 font-mono">
                   Company Focus: <span className="text-[#F59E0B]">{selectedCompany}</span> | Language:{" "}
                   <span className="text-[#3B82F6]">{blueprint.language}</span>
+                  {blueprint.jobDescriptionSummary && (
+                    <span className="block text-[#94A3B8]/90 mt-1">
+                      JD Alignment: {blueprint.jobDescriptionSummary}
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -328,18 +397,24 @@ SKILLS:
 
             {/* Questions Sequence Preview */}
             <div className="space-y-3">
-              <p className="text-xs font-mono uppercase tracking-wider text-[#94A3B8]">
-                Tailored 3-Stage Question Path
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <p className="text-xs font-mono uppercase tracking-wider text-[#94A3B8]">
+                  Interview Blueprint: 3-Stage Screening Preview
+                </p>
+                <span className="text-[10px] font-mono text-[#F59E0B] px-2 py-0.5 rounded bg-[#F59E0B]/10 border border-[#F59E0B]/30 self-start sm:self-auto">
+                  Live studio will ask fresh, deeper questions (not verbatim preview)
+                </span>
+              </div>
+
               <div className="space-y-3">
-                {blueprint.questions?.map((q: any) => (
+                {(blueprint.previewQuestions || blueprint.questions)?.map((q: any) => (
                   <div
                     key={q.id}
                     className="p-4 rounded-xl bg-[#0A0D14] border border-[#232B3E] space-y-2 hover:border-[#334155] transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono font-semibold text-[#F59E0B]">
-                        Q{q.id}. {q.type.replace(/_/g, " ").toUpperCase()}
+                        Preview Q{q.id}. {q.type.replace(/_/g, " ").toUpperCase()}
                       </span>
                       <button
                         type="button"
@@ -368,7 +443,7 @@ SKILLS:
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-[#232B3E]">
               <div className="text-xs font-mono text-[#94A3B8] flex items-center space-x-1.5">
                 <CheckCircle className="w-4 h-4 text-[#10B981]" />
-                <span>Microphone permission will be requested upon entering studio</span>
+                <span>Microphone will activate automatically inside the voice studio</span>
               </div>
 
               <button

@@ -30,11 +30,15 @@ interface InterviewSessionData {
     extractedProjects: string[];
     companyFocus: string;
     language: string;
-    questions: QuestionItem[];
+    jobDescriptionSummary?: string;
+    previewQuestions?: QuestionItem[];
+    liveQuestions?: QuestionItem[];
+    questions?: QuestionItem[];
   };
   company: string;
   role: string;
   language: string;
+  jobDescription?: string;
   startedAt: string;
 }
 
@@ -57,6 +61,7 @@ export default function InterviewPage() {
 
   // Session State
   const [sessionData, setSessionData] = useState<InterviewSessionData | null>(null);
+  const [activeQuestionList, setActiveQuestionList] = useState<QuestionItem[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [activeQuestionText, setActiveQuestionText] = useState("");
   const [evaluations, setEvaluations] = useState<QuestionEvaluation[]>([]);
@@ -67,7 +72,7 @@ export default function InterviewPage() {
 
   // Audio & Voice Loop State
   const [waveformMode, setWaveformMode] = useState<WaveformMode>("idle");
-  const [statusMessage, setStatusMessage] = useState("Initializing audio engine...");
+  const [statusMessage, setStatusMessage] = useState("Initializing live audio studio...");
   const [currentTranscript, setCurrentTranscript] = useState("");
   const [dualTranscripts, setDualTranscripts] = useState<Record<string, string> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -99,8 +104,17 @@ export default function InterviewPage() {
       try {
         const parsed: InterviewSessionData = JSON.parse(raw);
         setSessionData(parsed);
-        if (parsed.blueprint?.questions?.length > 0) {
-          setActiveQuestionText(parsed.blueprint.questions[0].question);
+
+        // Prioritize liveQuestions over previewQuestions so the live interview is fresh and deeper
+        const questionsToUse =
+          parsed.blueprint?.liveQuestions && parsed.blueprint.liveQuestions.length > 0
+            ? parsed.blueprint.liveQuestions
+            : parsed.blueprint?.questions || [];
+
+        setActiveQuestionList(questionsToUse);
+
+        if (questionsToUse.length > 0) {
+          setActiveQuestionText(questionsToUse[0].question);
         }
       } catch (err) {
         console.error("Failed to parse session data:", err);
@@ -114,12 +128,14 @@ export default function InterviewPage() {
           extractedProjects: ["Real-time WebSocket Chat Microservice"],
           companyFocus: "Swiggy",
           language: "Hinglish",
-          questions: [
+          jobDescriptionSummary:
+            "High concurrency real-time logistics ordering, distributed event queues, low latency microservices.",
+          previewQuestions: [
             {
               id: 1,
               type: "project_deep_dive",
               question:
-                "Parth, aapne resume me mention kiya hai ki aapne Redis use kiya tha chat service me. Can you explain cache invalidation aur connection heartbeat kaise handle kiya?",
+                "Parth, apne resume me likha hai ki aapne Redis use kiya tha chat service me. Can you explain cache invalidation and connection heartbeat kaise handle kiya?",
               intent: "Assess distributed caching and WebSocket resiliency under load",
             },
             {
@@ -137,6 +153,29 @@ export default function InterviewPage() {
               intent: "Assess incident management and engineering ownership",
             },
           ],
+          liveQuestions: [
+            {
+              id: 1,
+              type: "project_deep_dive",
+              question:
+                "Parth, resume me Redis chat service mentioned hai. Imagine kariye high concurrency peak traffic par agar ek Redis node fail ho jata hai ya network partition hota hai, toh message drops aur reconnect storm se server collapse ko aapne kaise prevent kiya?",
+              intent: "Evaluate production resilience, failover mechanics, and state reconciliation under sudden partition",
+            },
+            {
+              id: 2,
+              type: "technical_theory",
+              question:
+                "Swiggy ke real-time order tracking pipeline me, driver location updates har 3 seconds me aate hain. Redis geo-hashing ya Kafka streaming me se aap kaunsa architecture choose karenge aur latency SLA kaise guarantee karenge?",
+              intent: "Assess real-time geo-spatial indexing and distributed event streaming trade-offs",
+            },
+            {
+              id: 3,
+              type: "behavioral_scenario",
+              question:
+                "Suppose Diwali rush ke dauran payment gateway response timeout 45% jump kar gaya aur customers double charge ho rahe hain. On-call engineer ke roop me aapka immediate 15-minute action plan kya hoga?",
+              intent: "Evaluate live outage containment, idempotent transactions, and pressure management",
+            },
+          ],
         },
         company: "Swiggy",
         role: "Fullstack Engineer",
@@ -144,7 +183,8 @@ export default function InterviewPage() {
         startedAt: new Date().toISOString(),
       };
       setSessionData(mock);
-      setActiveQuestionText(mock.blueprint.questions[0].question);
+      setActiveQuestionList(mock.blueprint.liveQuestions || []);
+      setActiveQuestionText(mock.blueprint.liveQuestions![0].question);
     }
   }, []);
 
@@ -264,14 +304,14 @@ export default function InterviewPage() {
     [playTTSAudio, startRecording, isTextMode]
   );
 
-  // Trigger first question when session is loaded
+  // Trigger first live question when session and question list are ready
   useEffect(() => {
-    if (sessionData && sessionData.blueprint?.questions?.length > 0) {
-      const q1 = sessionData.blueprint.questions[0].question;
+    if (sessionData && activeQuestionList.length > 0) {
+      const q1 = activeQuestionList[0].question;
       const lang = sessionData.language || "Hinglish";
       startQuestionTurn(q1, lang);
     }
-  }, [sessionData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeQuestionList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle Answer Submission (via Audio or Text)
   const handleCompleteAnswer = async (manualText?: string) => {
@@ -319,6 +359,16 @@ export default function InterviewPage() {
 
       setCurrentTranscript(transcript);
 
+      // Context includes both projects and Job Description summary for high-precision grading
+      const contextSummary = [
+        sessionData?.blueprint?.extractedProjects?.join(", ") || "",
+        sessionData?.blueprint?.jobDescriptionSummary
+          ? `Target JD Core Focus: ${sessionData.blueprint.jobDescriptionSummary}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
       // 2. Evaluate answer with Gemini
       const evalRes = await fetch("/api/evaluate", {
         method: "POST",
@@ -326,12 +376,12 @@ export default function InterviewPage() {
         body: JSON.stringify({
           currentQuestion: activeQuestionText,
           candidateAnswer: transcript,
-          resumeContext: sessionData?.blueprint?.extractedProjects?.join(", ") || "",
+          resumeContext: contextSummary,
           company: sessionData?.company || "Tech Company",
           role: sessionData?.role || "Software Engineer",
           language: sessionData?.language || "Hinglish",
           questionIndex: currentQuestionIndex,
-          totalQuestions: sessionData?.blueprint?.questions?.length || 3,
+          totalQuestions: activeQuestionList.length || 3,
         }),
       });
 
@@ -357,7 +407,7 @@ export default function InterviewPage() {
       setEvaluations(updatedEvaluations);
 
       // 4. Determine next step
-      const totalQ = sessionData?.blueprint?.questions?.length || 3;
+      const totalQ = activeQuestionList.length || 3;
       const isComplete =
         evaluation.nextAction === "complete" || currentQuestionIndex >= totalQ - 1;
 
@@ -381,15 +431,15 @@ export default function InterviewPage() {
         }
         router.push("/report");
       } else {
-        // Proceed to next question
+        // Proceed to next live question
         const nextIdx = currentQuestionIndex + 1;
         setCurrentQuestionIndex(nextIdx);
 
         let nextQuestionText =
           evaluation.nextAction === "follow_up" && evaluation.followUpQuestion
             ? evaluation.followUpQuestion
-            : sessionData?.blueprint?.questions[nextIdx]?.question ||
-              "Next question regarding system architecture.";
+            : activeQuestionList[nextIdx]?.question ||
+              "Next question regarding system architecture and reliability.";
 
         setTypedAnswer("");
         startQuestionTurn(nextQuestionText, sessionData?.language || "Hinglish");
@@ -443,7 +493,7 @@ export default function InterviewPage() {
               </span>
             )}
             <span className="px-2.5 py-1 rounded bg-[#1A202C] border border-[#232B3E] text-[#F8FAFC]">
-              Question {currentQuestionIndex + 1} / {sessionData?.blueprint?.questions?.length || 3}
+              Live Question {currentQuestionIndex + 1} / {activeQuestionList.length || 3}
             </span>
           </div>
         </div>
@@ -455,8 +505,11 @@ export default function InterviewPage() {
             <div className="flex items-center justify-center space-x-2 text-xs font-mono text-[#F59E0B]">
               <Sparkles className="w-3.5 h-3.5" />
               <span className="uppercase tracking-wider">
-                {sessionData?.blueprint?.questions[currentQuestionIndex]?.type?.replace(/_/g, " ") ||
-                  "Active Question"}
+                {activeQuestionList[currentQuestionIndex]?.type?.replace(/_/g, " ") ||
+                  "Live Round"}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30">
+                Dynamic Deep Dive
               </span>
             </div>
 
@@ -466,8 +519,8 @@ export default function InterviewPage() {
 
             <p className="text-xs text-[#94A3B8] font-mono">
               Intent:{" "}
-              {sessionData?.blueprint?.questions[currentQuestionIndex]?.intent ||
-                "Assessing technical reasoning"}
+              {activeQuestionList[currentQuestionIndex]?.intent ||
+                "Assessing technical reasoning & JD alignment"}
             </p>
           </div>
 

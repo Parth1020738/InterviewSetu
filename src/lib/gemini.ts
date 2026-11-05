@@ -1,29 +1,42 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+export interface InterviewQuestionItem {
+  id: number;
+  type: "project_deep_dive" | "technical_theory" | "behavioral_scenario";
+  question: string;
+  expectedConcepts: string[];
+  intent: string;
+}
+
 export interface InterviewBlueprint {
   candidateName: string;
   extractedSkills: string[];
   extractedProjects: string[];
   companyFocus: string;
   language: string;
-  questions: {
-    id: number;
-    type: "project_deep_dive" | "technical_theory" | "behavioral_scenario";
-    question: string;
-    expectedConcepts: string[];
-    intent: string;
-  }[];
+  jobDescriptionSummary?: string;
+  previewQuestions: InterviewQuestionItem[];
+  liveQuestions: InterviewQuestionItem[];
+  /** Alias for previewQuestions for backward-compatibility */
+  questions: InterviewQuestionItem[];
 }
 
-/**
- * Generates an adaptive 3-question interview blueprint based on candidate resume and target company.
- */
-export async function generateInterviewBlueprint(params: {
-  resumeText: string;
+export interface GenerateBlueprintParams {
+  resumeText?: string;
+  jobDescription?: string;
   company: string;
   role: string;
   language: string;
-}): Promise<InterviewBlueprint> {
+}
+
+/**
+ * Generates an adaptive interview blueprint containing:
+ * 1. previewQuestions: 3 initial screening questions for onboarding review.
+ * 2. liveQuestions: 3 fresh, deeper, non-verbatim live interview questions tailored to the Resume + Job Description.
+ */
+export async function generateInterviewBlueprint(
+  params: GenerateBlueprintParams
+): Promise<InterviewBlueprint> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("Missing GEMINI_API_KEY in server environment.");
@@ -31,33 +44,62 @@ export async function generateInterviewBlueprint(params: {
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  // Preferred fast production models
   const modelCandidates = [
-    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
     "gemini-3.8-flash",
-    "gemini-1.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",
   ];
 
-  const prompt = `
-You are an expert technical interviewer at "${params.company}" conducting a first-round spoken screening for the role of "${params.role}".
-The candidate prefers to communicate in "${params.language}".
+  const resumeSection = params.resumeText?.trim()
+    ? `CANDIDATE RESUME / CV TEXT:
+"""
+${params.resumeText.trim()}
+"""`
+    : `CANDIDATE RESUME / CV TEXT:
+[No resume provided by candidate. Rely strictly on the Job Description and standard technical expectations for this role.]`;
 
-Here is the candidate's extracted resume text:
+  const jdSection = params.jobDescription?.trim()
+    ? `TARGET JOB DESCRIPTION (JD):
 """
-${params.resumeText || "No resume provided. Candidate claims familiarity with web development, data structures, and APIs."}
-"""
+${params.jobDescription.trim()}
+"""`
+    : `TARGET JOB DESCRIPTION (JD):
+[No explicit JD provided. Calibrate expectations to standard industry requirements for ${params.role} at ${params.company}.]`;
+
+  const prompt = `
+You are an expert technical hiring manager at "${params.company}" designing an interview pipeline for the role of "${params.role}".
+The interview language is "${params.language}".
+
+${resumeSection}
+
+${jdSection}
 
 YOUR TASK:
-1. Extract candidate's name, primary skills, and project highlights from the resume.
-2. Formulate a 3-question sequential interview blueprint specifically targeted to ${params.company}'s engineering expectations and the candidate's actual projects:
-   - Question 1: Project Deep Dive (Grill them on a specific architectural decision, bug, database choice, or metric mentioned in their resume).
-   - Question 2: Technical/System Theory (Ask a core CS/engineering question relevant to ${params.company}'s scale, e.g. concurrency, caching, latency, indexing, state management).
-   - Question 3: Behavioral / Incident Scenario (A practical debugging or team conflict scenario tailored to ${params.company}'s culture).
+1. Candidate Profiling:
+   - Extract candidate's name (or default to "Candidate"), primary skills, and project highlights from the resume (or inferred from the role).
+   - If a Job Description is provided, generate a concise summary of the core expectations.
+   - If no resume is uploaded, base all questions directly on the Job Description and company scale.
+
+2. Generate TWO DISTINCT SETS OF QUESTIONS:
+   
+   A. PREVIEW / SCREENING QUESTIONS ("previewQuestions" - 3 questions):
+      - These are for candidate onboarding review to set clear topical expectations.
+      - Q1: High-level overview of a major resume project or core domain expertise.
+      - Q2: Foundational CS or system concept directly required by the JD/company.
+      - Q3: General situational or collaborative scenario.
+
+   B. LIVE INTERVIEW QUESTIONS ("liveQuestions" - 3 questions):
+      - CRITICAL: These must NOT reuse the preview questions verbatim.
+      - They must be fresh, dynamic, and significantly deeper, specifically probing the intersection of what the candidate claims and what the Job Description demands.
+      - Q1 (Deeper Project Drill-down): Probe an unscripted edge case, scaling bottleneck, data consistency compromise, or failure mode in the candidate's actual projects.
+      - Q2 (Live System Challenge): Present a practical, high-throughput production architecture or coding dilemma matching ${params.company}'s actual scale and the JD's technology stack.
+      - Q3 (Pragmatic Fire Drill): Present an unscripted cross-functional crisis, production outage rollback, or ambiguous engineering trade-off.
 
 Language guidelines:
-- If language is "Hinglish", write questions in natural conversational Hinglish (e.g., "Aapne resume me likha hai ki aapne Redis use kiya tha caching ke liye. Can you explain cache invalidation kaise handle kiya?").
+- If language is "Hinglish", write both sets in natural, professional conversational Hinglish (e.g., "Aapne resume me Redis use kiya tha chat service me. Jab high concurrent writes aate hain, toh cache stampede aur invalidation kaise handle kiya?").
 - If language is "Hindi", write natural, professional Hindi.
-- If language is "English", write professional conversational English.
+- If language is "English", write crisp, conversational Indian/Global tech English.
 
 OUTPUT SCHEMA (STRICT JSON ONLY):
 {
@@ -66,13 +108,14 @@ OUTPUT SCHEMA (STRICT JSON ONLY):
   "extractedProjects": ["string"],
   "companyFocus": "string",
   "language": "${params.language}",
-  "questions": [
+  "jobDescriptionSummary": "string",
+  "previewQuestions": [
     {
       "id": 1,
       "type": "project_deep_dive",
-      "question": "string (the actual spoken question to candidate)",
+      "question": "string (preview screening question for onboarding)",
       "expectedConcepts": ["string"],
-      "intent": "string (what the interviewer is evaluating)"
+      "intent": "string"
     },
     {
       "id": 2,
@@ -88,6 +131,29 @@ OUTPUT SCHEMA (STRICT JSON ONLY):
       "expectedConcepts": ["string"],
       "intent": "string"
     }
+  ],
+  "liveQuestions": [
+    {
+      "id": 1,
+      "type": "project_deep_dive",
+      "question": "string (fresh, non-verbatim deeper live interview question)",
+      "expectedConcepts": ["string"],
+      "intent": "string"
+    },
+    {
+      "id": 2,
+      "type": "technical_theory",
+      "question": "string (fresh scenario grounded in JD requirements)",
+      "expectedConcepts": ["string"],
+      "intent": "string"
+    },
+    {
+      "id": 3,
+      "type": "behavioral_scenario",
+      "question": "string (fresh live incident / trade-off challenge)",
+      "expectedConcepts": ["string"],
+      "intent": "string"
+    }
   ]
 }
 `;
@@ -100,17 +166,30 @@ OUTPUT SCHEMA (STRICT JSON ONLY):
         model: modelName,
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0.4,
+          temperature: 0.45,
         },
       });
 
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
-      const parsed: InterviewBlueprint = JSON.parse(responseText);
+      const parsed = JSON.parse(responseText) as InterviewBlueprint;
+
+      // Ensure fallback safety if model returned legacy shape
+      if (!parsed.previewQuestions && (parsed as any).questions) {
+        parsed.previewQuestions = (parsed as any).questions;
+      }
+      if (!parsed.liveQuestions) {
+        parsed.liveQuestions = parsed.previewQuestions;
+      }
+      // Populate alias for backward compatibility
+      parsed.questions = parsed.previewQuestions;
+
       return parsed;
     } catch (err: any) {
       console.warn(`Model ${modelName} failed or unavailable, trying fallback:`, err.message);
       lastError = err;
+      // Brief pause before trying next candidate model
+      await new Promise((resolve) => setTimeout(resolve, 800));
     }
   }
 

@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
     let resumeText = "";
+    let jobDescription = "";
     let company = "Tech Startup";
     let role = "Fullstack Developer";
     let language = "Hinglish";
@@ -25,6 +26,11 @@ export async function POST(req: NextRequest) {
       role = (formData.get("role") as string)?.slice(0, 100) || role;
       language = (formData.get("language") as string)?.slice(0, 50) || language;
       const textParam = formData.get("resumeText") as string | null;
+      const jdParam = formData.get("jobDescription") as string | null;
+
+      if (jdParam) {
+        jobDescription = jdParam.slice(0, MAX_TEXT_LENGTH);
+      }
 
       if (file && file.size > 0) {
         if (file.size > MAX_PDF_BYTES) {
@@ -51,6 +57,7 @@ export async function POST(req: NextRequest) {
     } else {
       const body = await req.json().catch(() => ({}));
       resumeText = typeof body.resumeText === "string" ? body.resumeText : "";
+      jobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
       company = typeof body.company === "string" ? body.company.slice(0, 100) : company;
       role = typeof body.role === "string" ? body.role.slice(0, 100) : role;
       language = typeof body.language === "string" ? body.language.slice(0, 50) : language;
@@ -60,13 +67,18 @@ export async function POST(req: NextRequest) {
     if (resumeText.length > MAX_TEXT_LENGTH) {
       resumeText = resumeText.slice(0, MAX_TEXT_LENGTH);
     }
+    if (jobDescription.length > MAX_TEXT_LENGTH) {
+      jobDescription = jobDescription.slice(0, MAX_TEXT_LENGTH);
+    }
 
-    if (!resumeText.trim()) {
-      resumeText = "Software Engineering Intern with experience in React, Node.js, REST APIs, and SQL.";
+    // If candidate provided neither resume nor JD, default to a sensible software engineering baseline
+    if (!resumeText.trim() && !jobDescription.trim()) {
+      resumeText = "Software Engineering Candidate with experience in React, Node.js, distributed caches, and databases.";
     }
 
     const blueprint = await generateInterviewBlueprint({
       resumeText,
+      jobDescription,
       company,
       role,
       language,
