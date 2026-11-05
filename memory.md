@@ -4,7 +4,7 @@
 - **Name:** InterviewSetu
 - **Core Mission:** Multilingual AI Voice Interviewer Grounded in Resume & Target Company.
 - **Repository:** https://github.com/Parth1020738/InterviewSetu
-- **Contest:** Gnani AI Great Indian AI Internship Challenge 2026.
+- **Platform:** Enterprise Voice Terminal & AI Interview Simulation Platform.
 - **Deadline:** November 10, 2026.
 
 ## 2. Completed Milestones

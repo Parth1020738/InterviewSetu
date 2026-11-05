@@ -2,7 +2,7 @@
 
 ## Project: InterviewSetu
 **Tagline:** Context-Grounded Multilingual AI Voice Interviewer  
-**Contest:** Gnani AI Great Indian AI Internship Challenge (Nov 2026)  
+**Platform:** Enterprise Voice Terminal & AI Interview Simulation Platform  
 **Primary Integration:** Gnani AI (Prisma STT + Timbre TTS) & Gemini 1.5 Flash
 
 ---

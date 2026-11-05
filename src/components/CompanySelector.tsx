@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Building2, Sparkles, Check } from "lucide-react";
+import { Building2, Sparkles, Check, Briefcase } from "lucide-react";
 
 interface CompanyOption {
   id: string;
@@ -62,8 +62,11 @@ export function CompanySelector({
   selectedRole,
   onSelectRole,
 }: CompanySelectorProps) {
-  const [customMode, setCustomMode] = useState(false);
-  const [customInput, setCustomInput] = useState("");
+  const [customCompanyMode, setCustomCompanyMode] = useState(false);
+  const [customCompanyInput, setCustomCompanyInput] = useState("");
+
+  const [customRoleMode, setCustomRoleMode] = useState(false);
+  const [customRoleInput, setCustomRoleInput] = useState("");
 
   const roles = [
     "Fullstack Engineer (React + Node)",
@@ -77,60 +80,93 @@ export function CompanySelector({
     <div className="w-full space-y-4">
       {/* Role Selection */}
       <div className="space-y-2">
-        <label className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] flex items-center justify-between">
-          <span>02. Target Role</span>
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {roles.map((role) => {
-            const isSelected = selectedRole === role;
-            return (
-              <button
-                key={role}
-                type="button"
-                onClick={() => onSelectRole(role)}
-                className={`p-2.5 rounded-lg text-left text-xs font-medium transition-all border ${
-                  isSelected
-                    ? "bg-[#1A202C] text-[#F59E0B] border-[#F59E0B]/50 shadow-sm"
-                    : "bg-[#121620] text-[#94A3B8] border-[#232B3E] hover:border-[#334155] hover:text-[#F8FAFC]"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="truncate">{role}</span>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-[#F59E0B] flex-shrink-0" />}
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] flex items-center space-x-1.5">
+            <Briefcase className="w-3.5 h-3.5 text-[#F59E0B]" />
+            <span>02. Target Role</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setCustomRoleMode(!customRoleMode);
+              if (!customRoleMode && !customRoleInput) {
+                setCustomRoleInput(selectedRole);
+              }
+            }}
+            className="text-xs text-[#94A3B8] hover:text-[#F8FAFC] font-mono underline underline-offset-4"
+          >
+            {customRoleMode ? "Choose from presets" : "+ Custom role title"}
+          </button>
         </div>
+
+        {customRoleMode ? (
+          <div className="p-3 bg-[#121620] border border-[#232B3E] rounded-xl flex items-center space-x-2">
+            <Briefcase className="w-4 h-4 text-[#F59E0B]" />
+            <input
+              type="text"
+              value={customRoleInput}
+              onChange={(e) => {
+                setCustomRoleInput(e.target.value);
+                onSelectRole(e.target.value);
+              }}
+              placeholder="e.g. DevOps Engineer, Machine Learning Intern, Cloud Architect..."
+              className="w-full bg-transparent text-sm text-[#F8FAFC] placeholder:text-[#94A3B8]/60 focus:outline-none font-mono"
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {roles.map((role) => {
+              const isSelected = selectedRole === role;
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => onSelectRole(role)}
+                  className={`p-2.5 rounded-lg text-left text-xs font-medium transition-all border ${
+                    isSelected
+                      ? "bg-[#1A202C] text-[#F59E0B] border-[#F59E0B]/50 shadow-sm"
+                      : "bg-[#121620] text-[#94A3B8] border-[#232B3E] hover:border-[#334155] hover:text-[#F8FAFC]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="truncate">{role}</span>
+                    {isSelected && <Check className="w-3.5 h-3.5 text-[#F59E0B] flex-shrink-0" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Company Selection */}
       <div className="space-y-2 pt-1">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-mono uppercase tracking-wider text-[#94A3B8]">
+          <label className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] flex items-center space-x-1.5">
+            <Building2 className="w-3.5 h-3.5 text-[#F59E0B]" />
             <span>03. Target Company Pattern</span>
           </label>
           <button
             type="button"
-            onClick={() => setCustomMode(!customMode)}
+            onClick={() => setCustomCompanyMode(!customCompanyMode)}
             className="text-xs text-[#94A3B8] hover:text-[#F8FAFC] font-mono underline underline-offset-4"
           >
-            {customMode ? "Select preset companies" : "+ Custom company"}
+            {customCompanyMode ? "Select preset companies" : "+ Custom company"}
           </button>
         </div>
 
-        {customMode ? (
+        {customCompanyMode ? (
           <div className="p-3 bg-[#121620] border border-[#232B3E] rounded-xl flex items-center space-x-2">
-            <Building2 className="w-4 h-4 text-[#94A3B8]" />
+            <Building2 className="w-4 h-4 text-[#F59E0B]" />
             <input
               type="text"
-              value={customInput}
+              value={customCompanyInput}
               onChange={(e) => {
-                setCustomInput(e.target.value);
+                setCustomCompanyInput(e.target.value);
                 onSelectCompany(e.target.value);
               }}
               placeholder="e.g. Zerodha, CRED, Razorpay, or your target firm..."
-              className="w-full bg-transparent text-sm text-[#F8FAFC] placeholder:text-[#94A3B8]/60 focus:outline-none"
+              className="w-full bg-transparent text-sm text-[#F8FAFC] placeholder:text-[#94A3B8]/60 focus:outline-none font-mono"
             />
           </div>
         ) : (
@@ -172,4 +208,3 @@ export function CompanySelector({
     </div>
   );
 }
-

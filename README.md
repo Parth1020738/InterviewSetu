@@ -2,7 +2,7 @@
 
 # 🎙️ InterviewSetu
 ### Context-Grounded Multilingual AI Voice Interviewer
-**Developed for the Gnani AI Great Indian AI Internship Challenge (Nov 2026)**
+**Enterprise Voice Terminal • Grounded AI Interviewer**
 
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![Gnani Prisma](https://img.shields.io/badge/Gnani_Prisma_STT-v3.0_%7C_indic--auto-10B981?style=for-the-badge)](https://gnani.ai/)
